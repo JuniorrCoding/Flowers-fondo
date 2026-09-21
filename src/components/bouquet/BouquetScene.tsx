@@ -28,6 +28,7 @@ export function BouquetScene({ onComplete, stage }: BouquetSceneProps) {
   const [messages, setMessages] = useState<PopupMessage[]>([])
   const [lastMessageText, setLastMessageText] = useState<string | null>(null)
   const lastMessageTimeRef = useRef<number>(0)
+  const lastClickTimeRef = useRef<number>(0)
 
   useEffect(() => {
     if (stage === 'bouquet') {
@@ -45,6 +46,15 @@ export function BouquetScene({ onComplete, stage }: BouquetSceneProps) {
 
   const handleFlowerInteract = (flowerId: number, x: number, y: number) => {
     const now = Date.now()
+    
+    // Validación de debounce: no permitir nuevos clics dentro de 0.5 segundos
+    const timeSinceLastClick = now - lastClickTimeRef.current
+    if (timeSinceLastClick < 500) {
+      return
+    }
+    
+    lastClickTimeRef.current = now
+    
     const timeSinceLastMessage = now - lastMessageTimeRef.current
     let message: string
     
