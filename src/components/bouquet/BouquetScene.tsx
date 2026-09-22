@@ -10,9 +10,10 @@ import { INTERACTION_MESSAGES } from '../../data/messages'
 import './BouquetScene.css'
 
 interface BouquetSceneProps {
-  onComplete: () => void
-  stage: 'opening' | 'bouquet' | 'complete'
+  onComplete?: () => void
+  stage?: 'opening' | 'bouquet' | 'complete'
   showAgain?: boolean
+  isWallpaper?: boolean
 }
 
 interface PopupMessage {
@@ -22,16 +23,19 @@ interface PopupMessage {
   flowerY: number
 }
 
-export function BouquetScene({ onComplete, stage }: BouquetSceneProps) {
-  const [isRevealed, setIsRevealed] = useState(false)
-  const [isZoomed, setIsZoomed] = useState(false)
+export function BouquetScene({ onComplete, stage = 'bouquet', isWallpaper = false }: BouquetSceneProps) {
+  const [isRevealed, setIsRevealed] = useState(isWallpaper)
+  const [isZoomed, setIsZoomed] = useState(isWallpaper)
   const [messages, setMessages] = useState<PopupMessage[]>([])
   const [lastMessageText, setLastMessageText] = useState<string | null>(null)
   const lastMessageTimeRef = useRef<number>(0)
   const lastClickTimeRef = useRef<number>(0)
+  const wallpaperAutoMessageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // En modo wallpaper: mostrar directo, sin transiciones
+  // En modo regular: mantener comportamiento original
   useEffect(() => {
-    if (stage === 'bouquet') {
+    if (!isWallpaper && stage === 'bouquet' && onComplete) {
       const revealTimer = setTimeout(() => setIsRevealed(true), 1500)
       const zoomTimer = setTimeout(() => setIsZoomed(true), 3500)
       const completeTimer = setTimeout(onComplete, 8000)
@@ -42,7 +46,50 @@ export function BouquetScene({ onComplete, stage }: BouquetSceneProps) {
         clearTimeout(completeTimer)
       }
     }
-  }, [stage, onComplete])
+  }, [isWallpaper, stage, onComplete])
+
+  // En wallpaper: mensajes automáticos cada 8-12 segundos
+  useEffect(() => {
+    if (!isWallpaper) return
+
+    const showAutoMessage = () => {
+      const randomFlower = FLOWER_POSITIONS[Math.floor(Math.random() * FLOWER_POSITIONS.length)]
+      const randomIndex = Math.floor(Math.random() * INTERACTION_MESSAGES.length)
+      const message = INTERACTION_MESSAGES[randomIndex]
+
+      const now = Date.now()
+      setLastMessageText(message)
+      lastMessageTimeRef.current = now
+
+      const messageId = `auto-${now}`
+      setMessages(prev => [...prev, {
+        id: messageId,
+        text: message,
+        flowerX: randomFlower.x + window.innerWidth / 2 - 200,
+        flowerY: randomFlower.y + window.innerHeight / 2 - 250
+      }])
+    }
+
+    // Primer mensaje después de 5 segundos
+    const firstTimer = setTimeout(showAutoMessage, 5000)
+
+    // Luego cada 8-12 segundos
+    const startInterval = () => {
+      wallpaperAutoMessageTimerRef.current = setInterval(() => {
+        showAutoMessage()
+      }, 8000 + Math.random() * 4000)
+    }
+
+    const intervalStartTimer = setTimeout(startInterval, 5000)
+
+    return () => {
+      clearTimeout(firstTimer)
+      clearTimeout(intervalStartTimer)
+      if (wallpaperAutoMessageTimerRef.current) {
+        clearInterval(wallpaperAutoMessageTimerRef.current)
+      }
+    }
+  }, [isWallpaper])
 
   const handleFlowerInteract = (flowerId: number, x: number, y: number) => {
     const now = Date.now()
